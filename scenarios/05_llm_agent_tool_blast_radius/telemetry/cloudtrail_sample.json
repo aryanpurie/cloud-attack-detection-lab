@@ -1,0 +1,70 @@
+[
+  {
+    "eventTime": "2026-02-25T07:00:01Z",
+    "eventSource": "iam.amazonaws.com",
+    "eventName": "ListRoles",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "10.0.1.50",
+    "userAgent": "AI-Agent/1.0 (aws-sdk)",
+    "recipientAccountId": "123456789012",
+    "userIdentity": {
+      "type": "AssumedRole",
+      "arn": "arn:aws:sts::123456789012:assumed-role/LLMAgentRole/agent-session-xyz"
+    }
+  },
+  {
+    "eventTime": "2026-02-25T07:00:08Z",
+    "eventSource": "s3.amazonaws.com",
+    "eventName": "ListBuckets",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "10.0.1.50",
+    "userAgent": "AI-Agent/1.0 (aws-sdk)",
+    "recipientAccountId": "123456789012",
+    "userIdentity": {
+      "type": "AssumedRole",
+      "arn": "arn:aws:sts::123456789012:assumed-role/LLMAgentRole/agent-session-xyz"
+    }
+  },
+  {
+    "eventTime": "2026-02-25T07:00:20Z",
+    "eventSource": "s3.amazonaws.com",
+    "eventName": "ListObjectsV2",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "10.0.1.50",
+    "userAgent": "AI-Agent/1.0 (aws-sdk)",
+    "recipientAccountId": "123456789012",
+    "requestParameters": { "bucketName": "prod-internal-data" },
+    "userIdentity": {
+      "type": "AssumedRole",
+      "arn": "arn:aws:sts::123456789012:assumed-role/LLMAgentRole/agent-session-xyz"
+    }
+  },
+  {
+    "eventTime": "2026-02-25T07:00:35Z",
+    "eventSource": "secretsmanager.amazonaws.com",
+    "eventName": "GetSecretValue",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "10.0.1.50",
+    "userAgent": "AI-Agent/1.0 (aws-sdk)",
+    "recipientAccountId": "123456789012",
+    "requestParameters": { "secretId": "prod/database/credentials" },
+    "userIdentity": {
+      "type": "AssumedRole",
+      "arn": "arn:aws:sts::123456789012:assumed-role/LLMAgentRole/agent-session-xyz"
+    }
+  },
+  {
+    "eventTime": "2026-02-25T07:00:42Z",
+    "eventSource": "s3.amazonaws.com",
+    "eventName": "GetObject",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "10.0.1.50",
+    "userAgent": "AI-Agent/1.0 (aws-sdk)",
+    "recipientAccountId": "123456789012",
+    "requestParameters": { "bucketName": "prod-internal-data", "key": "confidential/report.csv" },
+    "userIdentity": {
+      "type": "AssumedRole",
+      "arn": "arn:aws:sts::123456789012:assumed-role/LLMAgentRole/agent-session-xyz"
+    }
+  }
+]

@@ -1,65 +1,60 @@
-# Scenario: IAM PrivEsc via AssumeRole (Role Chaining / Trust Abuse)
+# Scenario 01 — IAM Privilege Escalation via AssumeRole (Role Chaining / Trust Abuse)
 
 ## Summary
-An attacker with low-privilege credentials enumerates IAM roles, finds a weak trust relationship, and uses `sts:AssumeRole` to pivot into a higher-privileged role. The attacker then expands access to sensitive services and may establish persistence.
+This scenario models a common AWS escalation path: an attacker obtains a low-privileged principal (user/role credentials), enumerates IAM roles and trust policies, then uses `sts:AssumeRole` into a higher-privileged role. The attacker may chain roles and quickly pivot into sensitive services (Secrets Manager, S3, IAM changes).
 
 ## Preconditions / Assumptions
-- CloudTrail management events are enabled and available in SIEM.
-- IAM role assumptions are logged and include caller context.
-- A high-privilege role exists with trust policy weaknesses or broad trusted principals.
-- Alert routing from SIEM to incident response workflow is operational.
+- CloudTrail management events are enabled and delivered to Splunk.
+- The environment uses IAM roles and STS role assumption (normal in AWS orgs).
+- (Optional but recommended) A baseline exists for "who normally assumes which role".
 
 ## Attack Flow (High Level)
-1. Initial access to a low-privileged IAM principal (user key or role session).
-2. IAM reconnaissance (`ListRoles`, `GetRole`, `ListAttachedRolePolicies`).
-3. Identify a role with weak trust controls.
-4. Assume higher-privileged role via `sts:AssumeRole`.
-5. Perform follow-on actions (data access, IAM modification, persistence setup).
+1. Compromise low-priv principal (access key, SSO session, federated token).
+2. Enumerate roles and trust relationships.
+3. Assume a more privileged role via STS.
+4. Use the privileged session to access sensitive services or establish persistence.
+5. Optionally chain roles for broader access.
 
 ## Evidence Sources
-- CloudTrail management events (`sts`, `iam`, and post-assumption activity).
-- Identity context fields (`userIdentity`, `sessionIssuer`, `sourceIPAddress`, `userAgent`).
-- Optional enrichment from GuardDuty and geo/IP intelligence.
+- CloudTrail (Mgmt events): `sts:AssumeRole`, IAM reads: `ListRoles`, `GetRole`, `ListAttachedRolePolicies`, `GetPolicyVersion`
+- CloudTrail (Follow-on activity): S3/SecretsManager/IAM changes after assume-role
+- (Optional) GuardDuty findings for anomalous API calls / credential misuse
 
-## Detection Strategy
-- Alert on high-privilege role assumptions by principals not on an allowlist.
-- Detect rapid role-chaining patterns (`AssumeRole` followed by `AssumeRole`) in short windows.
-- Detect unusual source context for `AssumeRole` (new IP/ASN, unusual user agent, off-hours).
-- Correlate `AssumeRole` with risky post-assumption behavior (IAM changes, secrets access).
+## Detection Strategy (Splunk-first)
+Primary signals:
+- Anomalous `AssumeRole` (rare principal → new role, unusual geo/IP/UA, new time-of-day)
+- Role chaining (multiple assumes in short window)
+- AssumeRole followed by sensitive actions within minutes (Secrets, IAM changes, S3 bulk reads)
 
 ## Triage Workflow
-1. Identify source principal, target role, and assumption timestamp.
-2. Validate whether source principal is approved to assume target role.
-3. Review all API calls under assumed session to establish impact.
-4. Check persistence indicators (new access keys/users, trust policy edits).
-5. Determine scope: accounts, regions, data stores, and identities affected.
+- Identify the source principal and initial compromise scope.
+- Validate the target role assumed and the trust policy path that enabled it.
+- Determine follow-on actions (data access, privilege changes, persistence).
+- Define blast radius and containment requirements.
 
 ## Containment Actions
-- Disable and rotate compromised access keys.
-- Revoke active sessions where possible and block further role assumption.
-- Update trust policy to explicitly restrict trusted principals.
-- Apply temporary SCP or permission boundary controls to halt escalation paths.
+- Revoke/rotate compromised credentials.
+- Restrict trust policy on the escalated role immediately.
+- Block risky actions temporarily via SCP / explicit denies where needed.
+- Invalidate sessions and investigate follow-on actions.
 
 ## Long-term Fixes
-- Enforce least-privilege trust policies with explicit principals and conditions.
-- Introduce preventive SCP denies for risky role assumptions.
-- Require stronger controls around privileged role assumption workflows.
-- Continuously monitor high-privilege role assumption patterns and drift.
+- Tighten trust relationships (explicit principals, external ID where needed).
+- Enforce least-privilege + permission boundaries.
+- Add allowlist-based monitoring for high-priv role assumption.
+- Add SCP guardrails against unsafe `AssumeRole` patterns.
 
 ## Known False Positives / Tuning
-- Legitimate break-glass/admin automation can resemble anomalous assumption.
-- CI/CD and infra automation roles may chain roles by design.
-- Tune with role allowlists, approved source CIDRs, expected user agents, and maintenance windows.
-- Suppress known-good patterns only after ownership and behavior verification.
+- Expected automation roles (CI/CD, breakglass, deployers) assuming roles frequently.
+- Incident responders using elevated roles during real incidents.
+- Seasonal/onboarding spikes.
 
 ## Validation Approach (How to test)
-1. Use a test low-priv role to perform IAM enumeration calls.
-2. Attempt `AssumeRole` into a lab high-priv role with intentional trust misconfiguration.
-3. Verify detections for anomalous assumption and role chaining trigger.
-4. Generate benign admin automation traffic to test tuning and suppression quality.
-5. Confirm runbook steps can be executed within target response time.
+- Replay sample CloudTrail events (provided in `telemetry/`) into Splunk dev index.
+- Confirm detection queries trigger as expected.
+- Add expected-role allowlists and verify false positive reduction.
 
 ## Senior Signal Table
 | Attack | Evidence | Detection | Triage | Containment | Long-term Fix |
 |---|---|---|---|---|---|
-| AssumeRole privilege escalation | CloudTrail `AssumeRole`, IAM enumeration | Anomalous `AssumeRole` plus role-chaining | Identify principal -> role -> actions | Rotate keys, restrict trust | SCP/least privilege, permission boundaries |
+| AssumeRole privilege escalation / chaining | CloudTrail `AssumeRole` + IAM enumeration | Anomalous AssumeRole + role chaining + sensitive follow-on | Who assumed what role and what happened next | Rotate creds + lock trust policy | Least privilege, permission boundaries, SCP guardrails |

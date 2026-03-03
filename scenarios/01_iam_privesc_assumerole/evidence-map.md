@@ -1,19 +1,18 @@
-## Evidence Map
-| Data Source | Must-have fields | Why it matters | Common gaps |
-|---|---|---|---|
-| CloudTrail | eventName, userIdentity, sourceIPAddress, userAgent, requestParameters | attribution + sequence | missing data events |
-| GuardDuty | type, resource, severity | signal enrichment | not enabled org-wide |
-| VPC Flow Logs (optional) | srcaddr, dstaddr, dstport | IMDS/egress clues | not retained long enough |
+# Evidence Map — Scenario 01
 
-## Scenario-specific Event Map
-| Stage | Event(s) | Key fields to inspect | Notes |
+## Required Telemetry
+| Source | Event(s) | Must-have fields | Why it matters |
 |---|---|---|---|
-| Role discovery | `iam:ListRoles`, `iam:GetRole`, `iam:ListAttachedRolePolicies` | `userIdentity.arn`, `sourceIPAddress`, `userAgent`, `requestParameters.roleName` | Recon before escalation; low-volume but high context value |
-| Privilege escalation | `sts:AssumeRole` | `requestParameters.roleArn`, `requestParameters.roleSessionName`, `sourceIPAddress`, `userIdentity.arn` | Core event for this scenario |
-| Role chaining | `sts:AssumeRole` x2+ | session linkage fields, timestamps, `sourceIPAddress` | Detect short-window chain behavior |
-| Post-escalation impact | IAM, S3, Secrets Manager, KMS API calls | `eventSource`, `eventName`, `resources`, `errorCode` | Establish blast radius and intent |
+| CloudTrail (Mgmt) | `AssumeRole` | `userIdentity.*`, `requestParameters.roleArn`, `sourceIPAddress`, `userAgent`, `recipientAccountId`, `awsRegion` | attribution + target role + session context |
+| CloudTrail (Mgmt) | IAM read enum | `eventName`, `userIdentity.*`, `sourceIPAddress`, `userAgent` | indicates discovery preceding escalation |
+| CloudTrail (Mgmt) | IAM changes | `UpdateAssumeRolePolicy`, `Attach*Policy`, `CreateAccessKey` | persistence + privilege changes |
+| CloudTrail (Data, optional) | S3 / Secrets | `GetObject`, `GetSecretValue` | post-escalation objectives |
 
-## Collection and Quality Checks
-- CloudTrail management event retention covers investigation window.
-- SIEM parser extracts nested fields in `requestParameters` and `sessionContext`.
-- Time synchronization between source logs and SIEM indexes is verified.
+## Common Gaps
+- No baseline for "normal AssumeRole patterns"
+- Missing data events for S3 (sensitive bucket reads invisible)
+- Shared automation roles produce noisy AssumeRole activity
+
+## Notes
+- Start with high-confidence detections on **role assumption into privileged roles** or **role chaining**.
+- Add allowlists for known automation and breakglass roles as you harden.
