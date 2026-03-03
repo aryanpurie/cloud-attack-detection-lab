@@ -1,0 +1,17 @@
+flowchart LR
+    Logs["Telemetry\n(CloudTrail, S3 Data,\nKMS, Flow Logs,\nAgent Logs)"]
+    Normalize["Normalize & Enrich\n(parse fields,\nadd account/role tags,\nallowlists, baselines)"]
+    VLogic["Vendor-neutral\nDetection Logic\n(per scenario)"]
+    Engine["Detection Engine\n(SIEM, SQL engine,\nrule framework)"]
+    Alerts["Alerts / Findings"]
+    Runbooks["Runbooks\n(triage & investigation)"]
+    Controls["Controls & Fixes\n(SCPs, IAM, S3/KMS,\nIMDSv2, LLM guardrails)"]
+
+    Logs --> Normalize
+    Normalize --> VLogic
+    VLogic --> Engine
+    Engine --> Alerts
+    Alerts --> Runbooks
+    Runbooks --> Controls
+    Controls --> Normalize
+

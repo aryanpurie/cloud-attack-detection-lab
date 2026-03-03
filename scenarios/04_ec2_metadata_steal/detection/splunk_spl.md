@@ -1,5 +1,14 @@
 # Splunk Detections — Scenario 04 (EC2 Metadata Credential Theft)
 
+## Vendor-neutral detection logic
+
+- **Inputs:** CloudTrail management events for all APIs called by instance profile roles, especially `GetCallerIdentity`, discovery actions (for example, `ListBuckets`, `ListRoles`), data or secret access, and any persistence-related IAM changes. Optional VPC Flow Logs for traffic to `169.254.169.254`.
+- **Detection 1 – New source context for instance roles:** For each instance profile role, maintain a baseline of expected source IP ranges and user agents. Alert when the same role begins making API calls from a **new** IP/UA combination (for example, external IPs or CLI UA when normally only SDKs are used).
+- **Detection 2 – GetCallerIdentity from unusual context:** Flag `GetCallerIdentity` calls performed under instance profile roles from previously unseen IPs or user agents, then correlate with subsequent activity in the next N minutes to see if the role is being used broadly.
+- **Detection 3 – Service diversity spike:** For each instance profile role, count distinct AWS services (eventSource) used in a short window; alert when the number of services and total calls exceed normal patterns, suggesting credential abuse for discovery and lateral movement.
+- **Detection 4 – Metadata endpoint access (optional):** If flow logs or proxy logs are available, detect connections to `169.254.169.254` from application subnets or paths that should not talk directly to IMDS.
+- **Context:** Tie CloudTrail identities back to specific instances (for example, via session names or tagging) to drive host-level investigation and remediation.
+
 Assumption: CloudTrail management events are in Splunk; userIdentity.arn reflects assumed-role (instance profile) sessions. Adjust index/sourcetype as needed.
 
 ## Detection 1 — Instance role used from new source IP (baseline)

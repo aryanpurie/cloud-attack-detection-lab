@@ -1,5 +1,14 @@
 # Splunk Detections — Scenario 03 (CloudTrail Tampering)
 
+## Vendor-neutral detection logic
+
+- **Inputs:** CloudTrail management events for CloudTrail APIs (`StopLogging`, `UpdateTrail`, `DeleteTrail`), S3 bucket policy changes on log archive buckets, and KMS key changes associated with CloudTrail encryption.
+- **Detection 1 – Trail stop/update/delete:** Treat any invocation of `StopLogging`, `DeleteTrail`, or high-impact `UpdateTrail` fields as **high severity** when performed by principals outside a small, clearly defined allowlist.
+- **Detection 2 – Log bucket policy changes:** Monitor `PutBucketPolicy` on buckets designated as CloudTrail log destinations; flag any change that is not part of an approved change window or automation workflow.
+- **Detection 3 – KMS key changes for log encryption:** Track `DisableKey` and key policy updates for KMS keys used by CloudTrail; flag changes by non-approved principals.
+- **Detection 4 – Escalation → tampering sequence:** Correlate recent privilege escalation (for example, suspicious `AssumeRole` into admin roles) with subsequent trail or log-bucket/KMS changes within a moderate window (for example, 1 hour).
+- **Context:** Use organization-wide trails and immutable storage so that even if a single trail is modified, you retain visibility into the tampering event itself.
+
 Assumption: CloudTrail management events are in Splunk. Adjust index/sourcetype as needed.
 
 ## Detection 1 — High severity: StopLogging / DeleteTrail / UpdateTrail (allowlist-based)

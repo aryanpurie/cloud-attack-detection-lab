@@ -1,5 +1,14 @@
 # Splunk Detections — Scenario 01 (IAM PrivEsc via AssumeRole)
 
+## Vendor-neutral detection logic
+
+- **Inputs:** CloudTrail management events for `sts:AssumeRole` and IAM APIs (`ListRoles`, `GetRole`, `ListAttachedRolePolicies`, `GetPolicy`, `GetPolicyVersion`), plus follow-on IAM and secrets activity (`CreateAccessKey`, `UpdateAssumeRolePolicy`, `GetSecretValue`, S3 reads).
+- **Detection 1 – Privileged AssumeRole:** For each principal and time window, flag any successful `AssumeRole` into a *privileged* role (identified by role name, tags, or an explicit allowlist) when the caller is not on an approved allowlist for that role.
+- **Detection 2 – Role chaining:** For each principal, sort `AssumeRole` events by time and flag when the same caller assumes **two or more distinct roles** within a short window (for example, 10–15 minutes), indicating role chaining.
+- **Detection 3 – Enumeration → AssumeRole:** For each principal, look for IAM enumeration activity (role/list/get policy calls) followed by `AssumeRole` for any role within a medium window (for example, 30 minutes). Treat this sequence as suspicious discovery → escalation.
+- **Detection 4 – AssumeRole → sensitive actions:** For each principal/session, flag sequences where `AssumeRole` is followed within a short window (for example, 15 minutes) by sensitive actions such as secrets access, new access keys, or trust/policy modifications.
+- **Context:** Use allowlists and baselines for expected automation and breakglass roles, and enrich with source IP, user agent, region, and account to prioritize investigations.
+
 Assumption: CloudTrail logs are in Splunk with fields parsed. If your environment uses index=cloudtrail and sourcetype=aws:cloudtrail, keep that; otherwise replace.
 
 ## Detection 1 — High-confidence: Suspicious AssumeRole into "Privileged" Roles

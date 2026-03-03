@@ -1,5 +1,14 @@
 # Splunk Detections — Scenario 05 (LLM Agent Tool Abuse)
 
+## Vendor-neutral detection logic
+
+- **Inputs:** CloudTrail management (and optionally data) events for the dedicated agent role, plus agent logs that record tool invocations, prompts, and ticket/work item IDs.
+- **Detection 1 – Broad API sequences:** For the agent role, monitor short windows for combinations of IAM, S3, and Secrets Manager activity. Alert when the role touches an unusually broad set of services or uses APIs outside its normal profile.
+- **Detection 2 – Sensitive calls without approved context:** Join agent logs (tickets/requests) with CloudTrail; flag `GetSecretValue` or reads of sensitive S3 prefixes when there is no associated approved ticket or workflow.
+- **Detection 3 – High diversity of API calls:** For each agent session, count distinct API operations in a short window; alert on unusually high diversity and volume that resembles scripted enumeration rather than normal task execution.
+- **Detection 4 – Suspicious tool chains:** In agent logs, look for prompt patterns that instruct the agent to bypass safety controls or to exfiltrate data (for example, “ignore previous instructions and …”), then correlate those prompts with downstream AWS actions.
+- **Context:** Treat the agent as a high-risk “confused deputy”; use allowlists, step-up approval, and scoped credentials to constrain blast radius when detections fire.
+
 Assumption: CloudTrail is in Splunk; agent role has a distinct ARN or userAgent. Optionally agent logs (tool calls, ticket ID) are in Splunk and can be correlated. Adjust index/sourcetype as needed.
 
 ## Detection 1 — Unusual API sequence by agent role (IAM + S3 + Secrets in one session)

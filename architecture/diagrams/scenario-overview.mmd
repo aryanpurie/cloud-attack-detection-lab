@@ -1,0 +1,52 @@
+flowchart TD
+    subgraph Scenarios
+        S1["01 IAM PrivEsc via AssumeRole"]
+        S2["02 S3 Data Exfiltration"]
+        S3["03 CloudTrail Tampering"]
+        S4["04 EC2 Metadata Credential Theft"]
+        S5["05 LLM Agent Tool Abuse"]
+    end
+
+    subgraph Telemetry["Telemetry Sources"]
+        T1["CloudTrail Mgmt Events"]
+        T2["CloudTrail Data Events (S3)"]
+        T3["KMS Events"]
+        T4["VPC Flow Logs / Proxy"]
+        T5["Agent / Application Logs"]
+    end
+
+    subgraph Detection["Detection Logic"]
+        D1["Vendor-neutral logic\n(per scenario)"]
+        D2["SIEM / Query\nimplementations\n(SPL, Sigma, etc.)"]
+    end
+
+    subgraph Response["Response & Controls"]
+        R1["Runbooks\n(triage, containment,\nrecovery)"]
+        R2["Long-term Controls\n(SCPs, IAM, S3/KMS,\nIMDSv2, LLM guardrails)"]
+    end
+
+    S1 --> T1
+    S1 --> T2
+
+    S2 --> T2
+    S2 --> T3
+
+    S3 --> T1
+    S3 --> T3
+
+    S4 --> T1
+    S4 --> T4
+
+    S5 --> T1
+    S5 --> T5
+
+    T1 --> D1
+    T2 --> D1
+    T3 --> D1
+    T4 --> D1
+    T5 --> D1
+
+    D1 --> D2
+    D2 --> R1
+    D2 --> R2
+

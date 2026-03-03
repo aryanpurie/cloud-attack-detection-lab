@@ -1,5 +1,14 @@
 # Splunk Detections — Scenario 02 (S3 Data Exfiltration)
 
+## Vendor-neutral detection logic
+
+- **Inputs:** S3 Data Events for `ListObjects` / `ListObjectsV2` and `GetObject`, plus optional management events for `ListBuckets` and KMS `Decrypt` activity associated with S3 objects.
+- **Detection 1 – GetObject burst:** For each principal and bucket, count `GetObject` events in fixed or sliding windows (for example, 10–15 minutes) and flag bursts above an environment-specific threshold, especially for sensitive buckets.
+- **Detection 2 – First-time access to crown jewels:** Maintain a baseline of which principals have previously accessed each “crown-jewel” bucket. Alert when a principal reads or lists objects in such a bucket for the first time in a defined lookback period.
+- **Detection 3 – Enumeration → bulk reads:** For each principal and bucket, detect sequences where object listing (`ListObjects*`) is followed within a short window (for example, 30 minutes) by a large number of `GetObject` calls.
+- **Detection 4 – KMS Decrypt spike:** When S3 objects are KMS-encrypted, monitor `kms:Decrypt` volumes per principal and time window; flag spikes that correlate with S3 read bursts.
+- **Context:** Tune thresholds per bucket sensitivity and allowlist known bulk-read workloads (backups, ETL) to reduce expected noise.
+
 Assumption: CloudTrail logs (including S3 Data Events) are in Splunk with fields parsed. Adjust index/sourcetype as needed.
 
 ## Detection 1 — GetObject burst by principal and bucket
