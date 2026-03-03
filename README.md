@@ -12,6 +12,14 @@ This repository is designed to demonstrate senior-level security engineering acr
 
 ---
 
+## Start Here
+- **Scenario index:** [scenarios/README.md](scenarios/README.md)
+- **Recommended first scenario:** [scenarios/01_iam_privesc_assumerole/](scenarios/01_iam_privesc_assumerole/)
+- **Detection quality principles:** [docs/detection-quality.md](docs/detection-quality.md)
+- **Reference architecture:** [architecture/reference-architecture.md](architecture/reference-architecture.md)
+
+---
+
 ## What’s Inside
 
 ### Scenarios (end-to-end)
@@ -40,6 +48,21 @@ The lab assumes a baseline cloud security posture:
 - IAM roles follow least-privilege and controlled trust relationships
 
 See: `architecture/reference-architecture.md`
+
+---
+
+## Portfolio Proof (for reviewers)
+
+If you are reviewing this repository as part of an interview or portfolio review, here is how to get value quickly:
+
+- **Core story:** Five realistic AWS attack paths (IAM PrivEsc, S3 exfil, CloudTrail tamper, EC2 metadata theft, LLM agent abuse) each come with attack flow, evidence map, vendor-neutral detection logic, Splunk SPL, sample telemetry, runbook, and controls.
+- **Fast navigation (under 2 minutes):**
+  - Start with the scenario index: `scenarios/README.md`
+  - Open Scenario 01: `scenarios/01_iam_privesc_assumerole/`
+  - Skim `scenario.md` → `detection/splunk_spl.md` (vendor-neutral logic + SPL) → `runbook.md`
+- **Why these 5 scenarios:** They cover privilege escalation, data exfiltration, logging degradation, credential theft via IMDS, and AI/LLM tool misuse — a representative slice of modern cloud attack surface.
+- **How to “run” the lab without Splunk:** Use the included sample telemetry (`telemetry/*.json`) and the demo tool `tools/detect_assumerole_chain.py` to see how detections map to concrete events.
+- **What I’d add next (roadmap):** additional scenarios (KMS key abuse, cross-account persistence), Sigma rule equivalents for all detections, and CI to validate detections against evolving telemetry samples.
 
 ---
 

@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant Attacker
+    participant IAM as IAM API
+    participant STS as STS
+    participant Secrets as Secrets Manager
+    participant S3 as S3 / IAM
+
+    Note over Attacker,S3: Scenario 01 — IAM PrivEsc via AssumeRole
+
+    Attacker->>IAM: ListRoles / GetRole
+    Attacker->>STS: AssumeRole (ProdSecurityAdmin)
+    STS-->>Attacker: session credentials
+    Attacker->>STS: AssumeRole (AdminAccess)
+    STS-->>Attacker: chained session
+    Attacker->>Secrets: GetSecretValue
+    Attacker->>S3: (or) CreateAccessKey / CreateUser
+
+    Note over Attacker,S3: Detection: role chaining + escalation → objectives

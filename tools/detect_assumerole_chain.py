@@ -1,155 +1,135 @@
-"""
-Vendor-neutral helper to detect potential AssumeRole chaining in AWS CloudTrail logs.
-
-This script is intentionally simple and self-contained so it can be reused outside Splunk:
-
-- Input: a JSON file containing either
-  - an array of CloudTrail events, or
-  - newline-delimited JSON events (one event per line).
-- Output: a summary of principals that assumed multiple distinct roles within a short window.
-
-The logic mirrors the lab's vendor-neutral description:
-- Filter for sts:AssumeRole events.
-- Group events by calling principal.
-- Within each principal, sort by time and look for changes in target role ARN
-  that occur within a configurable time window (default: 900 seconds / 15 minutes).
-"""
-
 import argparse
-import datetime
 import json
-from typing import Any, Dict, Iterable, List, Tuple
+from collections import defaultdict
+from datetime import datetime, timezone
+from typing import Dict, List, Tuple
+
+SENSITIVE_EVENTS = {
+    "GetSecretValue",
+    "CreateAccessKey",
+    "CreateUser",
+    "AttachUserPolicy",
+    "AttachRolePolicy",
+    "PutRolePolicy",
+    "UpdateAssumeRolePolicy",
+}
+
+SCENARIO_FILES: Dict[str, str] = {
+    "01": "scenarios/01_iam_privesc_assumerole/telemetry/cloudtrail_sample.json",
+    "02": "scenarios/02_s3_exfiltration/telemetry/cloudtrail_sample.json",
+    "03": "scenarios/03_cloudtrail_tamper/telemetry/cloudtrail_sample.json",
+    "04": "scenarios/04_ec2_metadata_steal/telemetry/cloudtrail_sample.json",
+    "05": "scenarios/05_llm_agent_tool_blast_radius/telemetry/cloudtrail_sample.json",
+}
 
 
-def parse_time(ts: str) -> datetime.datetime:
-    # CloudTrail uses ISO8601 with Zulu time, for example "2026-02-25T03:13:02Z"
-    return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+def parse_time(t: str) -> datetime:
+    # CloudTrail eventTime is ISO 8601
+    return datetime.fromisoformat(t.replace("Z", "+00:00")).astimezone(timezone.utc)
 
 
-def load_events(path: str) -> Iterable[Dict[str, Any]]:
-    with open(path, "r", encoding="utf-8") as f:
-        content = f.read().strip()
-        if not content:
-            return []
-
-        # Try array first
-        try:
-            data = json.loads(content)
-            if isinstance(data, list):
-                return data
-        except json.JSONDecodeError:
-            pass
-
-        # Fallback: newline-delimited JSON
-        events: List[Dict[str, Any]] = []
-        for line in content.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-        return events
+def resolve_input_path(args: argparse.Namespace) -> str:
+    if args.file:
+        return args.file
+    if args.scenario and args.scenario in SCENARIO_FILES:
+        return SCENARIO_FILES[args.scenario]
+    # Default: scenario 01
+    return SCENARIO_FILES["01"]
 
 
-def extract_assumerole_events(events: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
+def normalize_events(events: List[dict]) -> List[Tuple[datetime, str, str, str, str]]:
+    norm: List[Tuple[datetime, str, str, str, str]] = []
     for e in events:
-        if e.get("eventSource") != "sts.amazonaws.com":
-            continue
-        if e.get("eventName") != "AssumeRole":
-            continue
-        out.append(e)
-    return out
+        et = parse_time(e["eventTime"])
+        name = e.get("eventName", "unknown")
+        role_arn = (e.get("requestParameters", {}) or {}).get("roleArn")
+        src = e.get("sourceIPAddress")
 
+        ui = (e.get("userIdentity", {}) or {})
+        u_type = ui.get("type")
 
-def principal_and_role(event: Dict[str, Any]) -> Tuple[str, str]:
-    ui = event.get("userIdentity", {}) or {}
-    principal = ui.get("arn") or ui.get("userName") or "UNKNOWN"
+        sess = ui.get("sessionContext") or {}
+        issuer = sess.get("sessionIssuer") or {}
+        issuer_arn = issuer.get("arn")
 
-    req = event.get("requestParameters", {}) or {}
-    role_arn = req.get("roleArn") or "UNKNOWN_ROLE"
-    return principal, role_arn
+        # lineage_key is stable across chained role sessions
+        if u_type == "AssumedRole" and issuer_arn:
+            lineage_key = issuer_arn
+        else:
+            lineage_key = ui.get("arn") or ui.get("userName") or "unknown"
 
+        norm.append((et, lineage_key, name, role_arn, src))
 
-def detect_role_chains(
-    events: List[Dict[str, Any]], window_seconds: int = 900
-) -> List[Dict[str, Any]]:
-    # Group by principal
-    per_principal: Dict[str, List[Dict[str, Any]]] = {}
-    for e in events:
-        principal, _ = principal_and_role(e)
-        per_principal.setdefault(principal, []).append(e)
-
-    findings: List[Dict[str, Any]] = []
-
-    for principal, evs in per_principal.items():
-        # Sort by time
-        evs_sorted = sorted(evs, key=lambda x: x.get("eventTime", ""))
-        # Track last role and time
-        last_role = None
-        last_time: datetime.datetime | None = None
-
-        for e in evs_sorted:
-            _, role_arn = principal_and_role(e)
-            t = parse_time(e["eventTime"])
-
-            if last_role is not None and role_arn != last_role and last_time is not None:
-                delta = (t - last_time).total_seconds()
-                if 0 <= delta <= window_seconds:
-                    findings.append(
-                        {
-                            "principal": principal,
-                            "from_role": last_role,
-                            "to_role": role_arn,
-                            "first_event_time": last_time.isoformat(),
-                            "second_event_time": t.isoformat(),
-                            "gap_seconds": int(delta),
-                            "sourceIPAddress": e.get("sourceIPAddress"),
-                            "awsRegion": e.get("awsRegion"),
-                            "recipientAccountId": e.get("recipientAccountId"),
-                        }
-                    )
-
-            last_role = role_arn
-            last_time = t
-
-    return findings
+    norm.sort(key=lambda x: x[0])
+    return norm
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Detect potential sts:AssumeRole chaining behavior in CloudTrail logs."
+        description=(
+            "Demo validator for AssumeRole privilege escalation. "
+            "By default uses Scenario 01 sample telemetry."
+        )
     )
     parser.add_argument(
-        "path", help="Path to CloudTrail JSON file (array or newline-delimited events)."
+        "--file",
+        "-f",
+        help=(
+            "Path to CloudTrail JSON file (array of events). "
+            "If not set, use --scenario or default to Scenario 01."
+        ),
     )
     parser.add_argument(
-        "--window-seconds",
-        type=int,
-        default=900,
-        help="Time window (in seconds) to treat two AssumeRole calls by the same principal as a chain (default: 900 = 15 minutes).",
+        "--scenario",
+        "-s",
+        choices=sorted(SCENARIO_FILES.keys()),
+        help="Scenario code (01–05) to use its sample telemetry.",
     )
     args = parser.parse_args()
 
-    events = load_events(args.path)
-    assume_events = extract_assumerole_events(events)
-    findings = detect_role_chains(assume_events, window_seconds=args.window_seconds)
+    path = resolve_input_path(args)
+    with open(path, "r", encoding="utf-8") as f:
+        events = json.load(f)
 
-    if not findings:
-        print("No potential role chaining patterns detected.")
-        return
+    norm = normalize_events(events)
 
-    print("Potential AssumeRole chaining patterns:")
-    for f in findings:
-        print(
-            f"- principal={f['principal']} from_role={f['from_role']} "
-            f"to_role={f['to_role']} gap_seconds={f['gap_seconds']} "
-            f"first={f['first_event_time']} second={f['second_event_time']} "
-            f"src_ip={f.get('sourceIPAddress')} region={f.get('awsRegion')} "
-            f"account={f.get('recipientAccountId')}"
-        )
+    # Track AssumeRole and follow-on sensitive actions by lineage key
+    assumed_roles: Dict[str, List[Tuple[datetime, str, str]]] = defaultdict(list)
+    sensitive_after: Dict[str, List[Tuple[datetime, str, str]]] = defaultdict(list)
+
+    for et, lineage_key, name, role_arn, src in norm:
+        if name == "AssumeRole" and role_arn:
+            assumed_roles[lineage_key].append((et, role_arn, src))
+        if name in SENSITIVE_EVENTS:
+            sensitive_after[lineage_key].append((et, name, src))
+
+    print("=== Findings: Potential AssumeRole PrivEsc / Role Chaining ===\n")
+    for lineage_key, assumes in assumed_roles.items():
+        roles = {r for _, r, _ in assumes}
+        if len(roles) >= 2:
+            first = assumes[0][0].isoformat()
+            last = assumes[-1][0].isoformat()
+            print(f"[ROLE CHAINING] lineage={lineage_key}")
+            print(f"  window={first} → {last}")
+            for t, r, src in assumes:
+                print(f"  - {t.isoformat()} AssumeRole roleArn={r} src={src}")
+            print()
+
+        # Sensitive actions after assumption (any time after first assume)
+        if lineage_key in sensitive_after:
+            first_assume_time = assumes[0][0]
+            follow = [
+                (t, n, s)
+                for (t, n, s) in sensitive_after[lineage_key]
+                if t >= first_assume_time
+            ]
+            if follow:
+                print(f"[ESCALATION → OBJECTIVES] lineage={lineage_key}")
+                for t, n, s in follow:
+                    print(f"  - {t.isoformat()} {n} src={s}")
+                print()
+
+    print("Done.")
 
 
 if __name__ == "__main__":
