@@ -1,0 +1,98 @@
+[
+  {
+    "eventVersion": "1.08",
+    "userIdentity": {
+      "type": "IAMUser",
+      "principalId": "AIDAEXAMPLEDEV01",
+      "arn": "arn:aws:iam::111122223333:user/dev-user",
+      "accountId": "111122223333",
+      "accessKeyId": "AKIAEXAMPLEDEVKEY"
+    },
+    "eventTime": "2026-02-27T09:10:11Z",
+    "eventSource": "iam.amazonaws.com",
+    "eventName": "ListRoles",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "198.51.100.23",
+    "userAgent": "aws-cli/2.15.10 Python/3.11",
+    "requestParameters": null,
+    "responseElements": null
+  },
+  {
+    "eventVersion": "1.08",
+    "userIdentity": {
+      "type": "IAMUser",
+      "principalId": "AIDAEXAMPLEDEV01",
+      "arn": "arn:aws:iam::111122223333:user/dev-user",
+      "accountId": "111122223333",
+      "accessKeyId": "AKIAEXAMPLEDEVKEY"
+    },
+    "eventTime": "2026-02-27T09:11:04Z",
+    "eventSource": "iam.amazonaws.com",
+    "eventName": "GetRole",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "198.51.100.23",
+    "userAgent": "aws-cli/2.15.10 Python/3.11",
+    "requestParameters": {
+      "roleName": "SecurityAuditRole"
+    },
+    "responseElements": null
+  },
+  {
+    "eventVersion": "1.08",
+    "userIdentity": {
+      "type": "IAMUser",
+      "principalId": "AIDAEXAMPLEDEV01",
+      "arn": "arn:aws:iam::111122223333:user/dev-user",
+      "accountId": "111122223333",
+      "accessKeyId": "AKIAEXAMPLEDEVKEY"
+    },
+    "eventTime": "2026-02-27T09:11:58Z",
+    "eventSource": "sts.amazonaws.com",
+    "eventName": "AssumeRole",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "198.51.100.23",
+    "userAgent": "aws-cli/2.15.10 Python/3.11",
+    "requestParameters": {
+      "roleArn": "arn:aws:iam::111122223333:role/AdminOpsRole",
+      "roleSessionName": "dev-user-escalated-session"
+    },
+    "responseElements": {
+      "assumedRoleUser": {
+        "assumedRoleId": "AROAXAMPLEADMIN:dev-user-escalated-session",
+        "arn": "arn:aws:sts::111122223333:assumed-role/AdminOpsRole/dev-user-escalated-session"
+      }
+    }
+  },
+  {
+    "eventVersion": "1.08",
+    "userIdentity": {
+      "type": "AssumedRole",
+      "principalId": "AROAXAMPLEADMIN:dev-user-escalated-session",
+      "arn": "arn:aws:sts::111122223333:assumed-role/AdminOpsRole/dev-user-escalated-session",
+      "accountId": "111122223333",
+      "sessionContext": {
+        "sessionIssuer": {
+          "type": "Role",
+          "arn": "arn:aws:iam::111122223333:role/AdminOpsRole",
+          "accountId": "111122223333",
+          "userName": "AdminOpsRole"
+        }
+      }
+    },
+    "eventTime": "2026-02-27T09:13:22Z",
+    "eventSource": "iam.amazonaws.com",
+    "eventName": "CreateAccessKey",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "198.51.100.23",
+    "userAgent": "aws-cli/2.15.10 Python/3.11",
+    "requestParameters": {
+      "userName": "backup-admin"
+    },
+    "responseElements": {
+      "accessKey": {
+        "accessKeyId": "AKIAEXAMPLEPERSIST01",
+        "status": "Active"
+      }
+    }
+  }
+]
