@@ -18,6 +18,20 @@ This repository is designed to demonstrate senior-level security engineering acr
 - **Detection quality principles:** [docs/detection-quality.md](docs/detection-quality.md)
 - **Reference architecture:** [architecture/reference-architecture.md](architecture/reference-architecture.md)
 
+## Quick Demo (No SIEM Required)
+
+Run the demo validator against the included sample telemetry:
+
+```bash
+python3 tools/detect_assumerole_chain.py --scenario 01
+python3 tools/detect_assumerole_chain.py --scenario 03
+```
+
+What you’ll see:
+
+* **[ROLE CHAINING]** — a lineage assumes 2+ distinct roles
+* **[ESCALATION → OBJECTIVES]** — sensitive actions occur after escalation
+
 ---
 
 ## What’s Inside
